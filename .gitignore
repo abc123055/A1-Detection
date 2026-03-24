@@ -1,0 +1,21 @@
+.idea/
+*.pyc
+__pycache__/
+
+# Checkpoints & pretrained models
+Codes/checkpoints/pretrains/
+Codes/checkpoints/avenue.*
+Codes/checkpoints/ped1.*
+Codes/checkpoints/ped2.*
+Codes/checkpoints/shanghaitech.*
+Codes/checkpoints/flownet-SD.*
+
+# Datasets
+Data/avenue/
+Data/ped1/
+Data/ped2/
+Data/shanghaitech/
+
+# IDE & tool configs
+.vscode/
+.claude/

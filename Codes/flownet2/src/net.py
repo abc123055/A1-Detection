@@ -4,11 +4,10 @@ import os
 import tensorflow as tf
 from .flowlib import flow_to_image, write_flow
 import numpy as np
-# from scipy.misc import imread, imsave, imresize
 import cv2
 import uuid
 from .training_schedules import LONG_SCHEDULE
-slim = tf.contrib.slim
+import tf_slim as slim
 
 os.environ['CUDA_DEVICES_ORDER'] = "PCI_BUS_ID"
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -58,10 +57,6 @@ class Net(object):
         input_b = cv2.resize(input_b, (512, 384))
         print(input_a.shape, input_b.shape)
 
-        # Convert from RGB -> BGR
-        # input_a = input_a[..., [2, 1, 0]]
-        # input_b = input_b[..., [2, 1, 0]]
-
         # Scale from [0, 255] -> [0.0, 1.0] if needed
         if input_a.max() > 1.0:
             input_a = input_a / 255.0
@@ -78,11 +73,11 @@ class Net(object):
         predictions = self.model(inputs, training_schedule)
         pred_flow = predictions['flow']
 
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
 
-        config = tf.ConfigProto()
+        config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        with tf.Session(config=config) as sess:
+        with tf.compat.v1.Session(config=config) as sess:
             saver.restore(sess, checkpoint)
             pred_flow = sess.run(pred_flow)[0, :, :, :]
 
@@ -99,15 +94,15 @@ class Net(object):
                 write_flow(pred_flow, full_out_path)
 
     def train(self, log_dir, training_schedule, input_a, input_b, flow, checkpoints=None):
-        tf.summary.image("image_a", input_a, max_outputs=2)
-        tf.summary.image("image_b", input_b, max_outputs=2)
+        tf.compat.v1.summary.image("image_a", input_a, max_outputs=2)
+        tf.compat.v1.summary.image("image_b", input_b, max_outputs=2)
 
-        self.learning_rate = tf.train.piecewise_constant(
+        self.learning_rate = tf.compat.v1.train.piecewise_constant(
             self.global_step,
             [tf.cast(v, tf.int64) for v in training_schedule['step_values']],
             training_schedule['learning_rates'])
 
-        optimizer = tf.train.AdamOptimizer(
+        optimizer = tf.compat.v1.train.AdamOptimizer(
             self.learning_rate,
             training_schedule['momentum'],
             training_schedule['momentum2'])
@@ -118,34 +113,34 @@ class Net(object):
         }
         predictions = self.model(inputs, training_schedule)
         total_loss = self.loss(flow, predictions)
-        tf.summary.scalar('loss', total_loss)
+        tf.compat.v1.summary.scalar('loss', total_loss)
 
         if checkpoints:
-            for (checkpoint_path, (scope, new_scope)) in checkpoints.iteritems():
+            for (checkpoint_path, (scope, new_scope)) in checkpoints.items():
                 variables_to_restore = slim.get_variables(scope=scope)
                 renamed_variables = {
                     var.op.name.split(new_scope + '/')[1]: var
                     for var in variables_to_restore
                 }
-                restorer = tf.train.Saver(renamed_variables)
-                with tf.Session() as sess:
+                restorer = tf.compat.v1.train.Saver(renamed_variables)
+                with tf.compat.v1.Session() as sess:
                     restorer.restore(sess, checkpoint_path)
 
         # Show the generated flow in TensorBoard
         if 'flow' in predictions:
             pred_flow_0 = predictions['flow'][0, :, :, :]
-            pred_flow_0 = tf.py_func(flow_to_image, [pred_flow_0], tf.uint8)
+            pred_flow_0 = tf.py_function(flow_to_image, [pred_flow_0], tf.uint8)
             pred_flow_1 = predictions['flow'][1, :, :, :]
-            pred_flow_1 = tf.py_func(flow_to_image, [pred_flow_1], tf.uint8)
+            pred_flow_1 = tf.py_function(flow_to_image, [pred_flow_1], tf.uint8)
             pred_flow_img = tf.stack([pred_flow_0, pred_flow_1], 0)
-            tf.summary.image('pred_flow', pred_flow_img, max_outputs=2)
+            tf.compat.v1.summary.image('pred_flow', pred_flow_img, max_outputs=2)
 
         true_flow_0 = flow[0, :, :, :]
-        true_flow_0 = tf.py_func(flow_to_image, [true_flow_0], tf.uint8)
+        true_flow_0 = tf.py_function(flow_to_image, [true_flow_0], tf.uint8)
         true_flow_1 = flow[1, :, :, :]
-        true_flow_1 = tf.py_func(flow_to_image, [true_flow_1], tf.uint8)
+        true_flow_1 = tf.py_function(flow_to_image, [true_flow_1], tf.uint8)
         true_flow_img = tf.stack([true_flow_0, true_flow_1], 0)
-        tf.summary.image('true_flow', true_flow_img, max_outputs=2)
+        tf.compat.v1.summary.image('true_flow', true_flow_img, max_outputs=2)
 
         train_op = slim.learning.create_train_op(
             total_loss,
@@ -153,9 +148,9 @@ class Net(object):
             summarize_gradients=True)
 
         if self.debug:
-            with tf.Session() as sess:
-                sess.run(tf.global_variables_initializer())
-                tf.train.start_queue_runners(sess)
+            with tf.compat.v1.Session() as sess:
+                sess.run(tf.compat.v1.global_variables_initializer())
+                tf.compat.v1.train.start_queue_runners(sess)
                 slim.learning.train_step(
                     sess,
                     train_op,
@@ -170,7 +165,6 @@ class Net(object):
             slim.learning.train(
                 train_op,
                 log_dir,
-                # session_config=tf.ConfigProto(allow_soft_placement=True),
                 global_step=self.global_step,
                 save_summaries_secs=60,
                 number_of_steps=training_schedule['max_iter']

@@ -1,4 +1,6 @@
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+
 import os
 
 from models import generator, discriminator, flownet, initialize_flownet
@@ -39,7 +41,7 @@ with tf.name_scope('dataset'):
     train_loader = DataLoader(train_folder, resize_height=height, resize_width=width)
     train_dataset = train_loader(batch_size=batch_size, time_steps=num_his, num_pred=1)
 
-    train_it = train_dataset.make_one_shot_iterator()
+    train_it = tf.compat.v1.data.make_one_shot_iterator(train_dataset)
     train_videos_clips_tensor = train_it.get_next()
     train_videos_clips_tensor.set_shape([batch_size, height, width, 3*(num_his + 1)])
 
@@ -51,7 +53,7 @@ with tf.name_scope('dataset'):
 
     test_loader = DataLoader(test_folder, resize_height=height, resize_width=width)
     test_dataset = test_loader(batch_size=batch_size, time_steps=num_his, num_pred=1)
-    test_it = test_dataset.make_one_shot_iterator()
+    test_it = tf.compat.v1.data.make_one_shot_iterator(test_dataset)
     test_videos_clips_tensor = test_it.get_next()
     test_videos_clips_tensor.set_shape([batch_size, height, width, 3*(num_his + 1)])
 
@@ -62,14 +64,14 @@ with tf.name_scope('dataset'):
     print('test prediction gt = {}'.format(test_gt))
 
 # define training generator function
-with tf.variable_scope('generator', reuse=None):
-    print('training = {}'.format(tf.get_variable_scope().name))
+with tf.compat.v1.variable_scope('generator', reuse=None):
+    print('training = {}'.format(tf.compat.v1.get_variable_scope().name))
     train_outputs = generator(train_inputs, layers=4, output_channel=3)
     train_psnr_error = psnr_error(gen_frames=train_outputs, gt_frames=train_gt)
 
 # define testing generator function
-with tf.variable_scope('generator', reuse=True):
-    print('testing = {}'.format(tf.get_variable_scope().name))
+with tf.compat.v1.variable_scope('generator', reuse=True):
+    print('testing = {}'.format(tf.compat.v1.get_variable_scope().name))
     test_outputs = generator(test_inputs, layers=4, output_channel=3)
     test_psnr_error = psnr_error(gen_frames=test_outputs, gt_frames=test_gt)
 
@@ -101,9 +103,9 @@ else:
 
 # define adversarial loss
 if adversarial:
-    with tf.variable_scope('discriminator', reuse=None):
+    with tf.compat.v1.variable_scope('discriminator', reuse=None):
         real_logits, real_outputs = discriminator(inputs=train_gt)
-    with tf.variable_scope('discriminator', reuse=True):
+    with tf.compat.v1.variable_scope('discriminator', reuse=True):
         fake_logits, fake_outputs = discriminator(inputs=train_outputs)
 
     print('real_outputs = {}'.format(real_outputs))
@@ -120,18 +122,18 @@ with tf.name_scope('training'):
     g_loss = tf.add_n([lp_loss * lam_lp, gdl_loss * lam_gdl, adv_loss * lam_adv, flow_loss * lam_flow], name='g_loss')
 
     g_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='g_step')
-    g_lrate = tf.train.piecewise_constant(g_step, boundaries=const.LRATE_G_BOUNDARIES, values=const.LRATE_G)
-    g_optimizer = tf.train.AdamOptimizer(learning_rate=g_lrate, name='g_optimizer')
-    g_vars = tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+    g_lrate = tf.compat.v1.train.piecewise_constant(g_step, boundaries=const.LRATE_G_BOUNDARIES, values=const.LRATE_G)
+    g_optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=g_lrate, name='g_optimizer')
+    g_vars = tf.compat.v1.get_collection(key=tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
 
     g_train_op = g_optimizer.minimize(g_loss, global_step=g_step, var_list=g_vars, name='g_train_op')
 
     if adversarial:
         # training discriminator
         d_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='d_step')
-        d_lrate = tf.train.piecewise_constant(d_step, boundaries=const.LRATE_D_BOUNDARIES, values=const.LRATE_D)
-        d_optimizer = tf.train.AdamOptimizer(learning_rate=d_lrate, name='g_optimizer')
-        d_vars = tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+        d_lrate = tf.compat.v1.train.piecewise_constant(d_step, boundaries=const.LRATE_D_BOUNDARIES, values=const.LRATE_D)
+        d_optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=d_lrate, name='g_optimizer')
+        d_vars = tf.compat.v1.get_collection(key=tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
 
         d_train_op = d_optimizer.minimize(dis_loss, global_step=d_step, var_list=d_vars, name='d_optimizer')
     else:
@@ -140,25 +142,25 @@ with tf.name_scope('training'):
         d_train_op = None
 
 # add all to summaries
-tf.summary.scalar(tensor=train_psnr_error, name='train_psnr_error')
-tf.summary.scalar(tensor=test_psnr_error, name='test_psnr_error')
-tf.summary.scalar(tensor=g_loss, name='g_loss')
-tf.summary.scalar(tensor=adv_loss, name='adv_loss')
-tf.summary.scalar(tensor=dis_loss, name='dis_loss')
-tf.summary.image(tensor=train_outputs, name='train_outputs')
-tf.summary.image(tensor=train_gt, name='train_gt')
-tf.summary.image(tensor=test_outputs, name='test_outputs')
-tf.summary.image(tensor=test_gt, name='test_gt')
-summary_op = tf.summary.merge_all()
+tf.compat.v1.summary.scalar(tensor=train_psnr_error, name='train_psnr_error')
+tf.compat.v1.summary.scalar(tensor=test_psnr_error, name='test_psnr_error')
+tf.compat.v1.summary.scalar(tensor=g_loss, name='g_loss')
+tf.compat.v1.summary.scalar(tensor=adv_loss, name='adv_loss')
+tf.compat.v1.summary.scalar(tensor=dis_loss, name='dis_loss')
+tf.compat.v1.summary.image(tensor=train_outputs, name='train_outputs')
+tf.compat.v1.summary.image(tensor=train_gt, name='train_gt')
+tf.compat.v1.summary.image(tensor=test_outputs, name='test_outputs')
+tf.compat.v1.summary.image(tensor=test_gt, name='test_gt')
+summary_op = tf.compat.v1.summary.merge_all()
 
-config = tf.ConfigProto()
+config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-with tf.Session(config=config) as sess:
+with tf.compat.v1.Session(config=config) as sess:
     # summaries
-    summary_writer = tf.summary.FileWriter(summary_dir, graph=sess.graph)
+    summary_writer = tf.compat.v1.summary.FileWriter(summary_dir, graph=sess.graph)
 
     # initialize weights
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.compat.v1.global_variables_initializer())
     print('Init successfully!')
 
     if lam_flow != 0:
@@ -166,11 +168,11 @@ with tf.Session(config=config) as sess:
         initialize_flownet(sess, const.FLOWNET_CHECKPOINT)
 
     # tf saver
-    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=None)
-    restore_var = [v for v in tf.global_variables()]
-    loader = tf.train.Saver(var_list=restore_var)
+    saver = tf.compat.v1.train.Saver(var_list=tf.compat.v1.global_variables(), max_to_keep=None)
+    restore_var = [v for v in tf.compat.v1.global_variables()]
+    loader = tf.compat.v1.train.Saver(var_list=restore_var)
     if os.path.isdir(snapshot_dir):
-        ckpt = tf.train.get_checkpoint_state(snapshot_dir)
+        ckpt = tf.compat.v1.train.get_checkpoint_state(snapshot_dir)
         if ckpt and ckpt.model_checkpoint_path:
             load(loader, sess, ckpt.model_checkpoint_path)
         else:

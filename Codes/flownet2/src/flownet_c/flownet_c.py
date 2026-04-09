@@ -4,7 +4,7 @@ from ..correlation import correlation
 from ..downsample import downsample
 import math
 import tensorflow as tf
-slim = tf.contrib.slim
+import tf_slim as slim
 
 
 class FlowNetC(Net):
@@ -14,7 +14,7 @@ class FlowNetC(Net):
 
     def model(self, inputs, training_schedule, trainable=True):
         _, height, width, _ = inputs['input_a'].shape.as_list()
-        with tf.variable_scope('FlowNetC'):
+        with tf.compat.v1.variable_scope('FlowNetC'):
             with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
                                 # Only backprop this network if trainable
                                 trainable=trainable,
@@ -112,7 +112,7 @@ class FlowNetC(Net):
 
                     flow = predict_flow2 * 20.0
                     # TODO: Look at Accum (train) or Resample (deploy) to see if we need to do something different
-                    flow = tf.image.resize_bilinear(flow,
+                    flow = tf.compat.v1.image.resize_bilinear(flow,
                                                     tf.stack([height, width]),
                                                     align_corners=True)
 
@@ -161,7 +161,7 @@ class FlowNetC(Net):
         downsampled_flow2 = downsample(flow, size)
         losses.append(average_endpoint_error(downsampled_flow2, predict_flow2))
 
-        loss = tf.losses.compute_weighted_loss(losses, [0.32, 0.08, 0.02, 0.01, 0.005])
+        loss = tf.compat.v1.losses.compute_weighted_loss(losses, [0.32, 0.08, 0.02, 0.01, 0.005])
 
         # Return the 'total' loss: loss fns + regularization terms defined in the model
-        return tf.losses.get_total_loss()
+        return tf.compat.v1.losses.get_total_loss()

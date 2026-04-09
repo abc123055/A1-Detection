@@ -81,10 +81,6 @@ class DataLoader(object):
             self.videos[video_name]['length'] = len(self.videos[video_name]['frame'])
 
     def get_video_clips(self, video, start, end):
-        # assert video in self.videos, 'video = {} must in {}!'.format(video, self.videos.keys())
-        # assert start >= 0, 'start = {} must >=0!'.format(start)
-        # assert end <= self.videos[video]['length'], 'end = {} must <= {}'.format(video, self.videos[video]['length'])
-
         batch = []
         for i in range(start, end):
             image = np_load_frame(self.videos[video]['frame'][i], self._resize_height, self._resize_width)
@@ -102,8 +98,8 @@ def log10(t):
     @return: A tensor with the base-10 log of each element in t.
     """
 
-    numerator = tf.log(t)
-    denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+    numerator = tf.math.log(t)
+    denominator = tf.math.log(tf.constant(10, dtype=numerator.dtype))
     return numerator / denominator
 
 
@@ -121,7 +117,7 @@ def psnr_error(gen_frames, gt_frames):
              batch.
     """
     shape = tf.shape(gen_frames)
-    num_pixels = tf.to_float(shape[1] * shape[2] * shape[3])
+    num_pixels = tf.cast(shape[1] * shape[2] * shape[3], tf.float32)
     gt_frames = (gt_frames + 1.0) / 2.0
     gen_frames = (gen_frames + 1.0) / 2.0
     square_diff = tf.square(gt_frames - gen_frames)
@@ -155,7 +151,3 @@ def save(saver, sess, logdir, step):
         os.makedirs(logdir)
     saver.save(sess, checkpoint_path, global_step=step)
     print('The checkpoint has been created.')
-
-
-
-

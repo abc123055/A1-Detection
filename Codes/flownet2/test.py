@@ -1,14 +1,16 @@
 import os
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+
 import numpy as np
-from scipy.misc import imread
+import cv2
 import matplotlib
 from src.flowlib import read_flow, flow_to_image
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 
 _preprocessing_ops = tf.load_op_library(
-    tf.resource_loader.get_path_to_datafile("./src/ops/build/preprocessing.so"))
+    tf.compat.v1.resource_loader.get_path_to_datafile("./src/ops/build/preprocessing.so"))
 
 
 def display(img, c):
@@ -53,14 +55,14 @@ def main():
     params_b_spread = []
     params_b_prob = []
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         with tf.device('/gpu:0'):
-            image_a = imread('./img0.ppm') / 255.0
-            image_b = imread('./img1.ppm') / 255.0
+            image_a = cv2.imread('./img0.ppm').astype(np.float64) / 255.0
+            image_b = cv2.imread('./img1.ppm').astype(np.float64) / 255.0
             flow = read_flow('./flow.flo')
 
-            image_a_tf = tf.expand_dims(tf.to_float(tf.constant(image_a, dtype=tf.float64)), 0)
-            image_b_tf = tf.expand_dims(tf.to_float(tf.constant(image_b, dtype=tf.float64)), 0)
+            image_a_tf = tf.expand_dims(tf.cast(tf.constant(image_a, dtype=tf.float64), tf.float32), 0)
+            image_b_tf = tf.expand_dims(tf.cast(tf.constant(image_b, dtype=tf.float64), tf.float32), 0)
 
             preprocess = _preprocessing_ops.data_augmentation(image_a_tf,
                                                               image_b_tf,
@@ -85,7 +87,7 @@ def main():
             print(trans.shape)
             print(inv_trans.shape)
 
-            flow_tf = tf.expand_dims(tf.to_float(tf.constant(flow)), 0)
+            flow_tf = tf.expand_dims(tf.cast(tf.constant(flow), tf.float32), 0)
             aug_flow_tf = _preprocessing_ops.flow_augmentation(flow_tf, trans, inv_trans, crop)
 
             aug_flow = sess.run(aug_flow_tf)[0, :, :, :]
@@ -110,54 +112,7 @@ def main():
 
             plt.show()
 
-            # image_b_aug = sess.run(image_b_tf)
-            #
-            # display(np.expand_dims(image_a, 0), 0)
-            # display(np.expand_dims(image_b, 0), 1)
-            # display(image_a_aug, 2)
-            # display(image_b_aug, 3)
-            # plt.show()
-
-            # o = _preprocessing_ops.flow_augmentation(flow, trans, inv_t, [4, 8])
-            # print n[:, :, :]
-            # print n[0, 0, 1], n[0, 0, 0]
-            # print n[1, 0, 1], n[1, 0, 0]
-            # print n[2, 0, 1], n[2, 0, 0]
-            # print '---'
-            # print sess.run(o)
-
-            """# Goes along width first!!
-            // Caffe, NKHW: ((n * K + k) * H + h) * W + w at point (n, k, h, w)
-            // TF, NHWK: ((n * H + h) * W + w) * K + k at point (n, h, w, k)
-
-            H=5, W=10, K=2
-            n=0, h=1, w=5, k=0
-
-            (2 * 10)                + c
-
-            30      49                  n[0, 1, 5, 0]"""
-
 
 print(os.getpid())
 input("Press Enter to continue...")
 main()
-
-# Last index is channel!!
-
-#   K
-
-# value 13 should be at [0, 2, 7, 1] aka batch=0, height=1, width=0, channel=0. it is at index=20.
-#
-# items = {
-#     'N': [0, 0],
-#     'H': [5, 2],
-#     'W': [10, 7],
-#     'K': [2, 1],
-# }
-#
-# for (i1, v1) in items.iteritems():
-#     for (i2, v2) in items.iteritems():
-#         for (i3, v3) in items.iteritems():
-#             for (i4, v4) in items.iteritems():
-#                 if ((v1[1] * v2[0] + v2[1]) * v3[0] + v3[1]) * v4[0] + v4[1] == 55:
-#                     print 'found it: ', i1, i2, i3, i4

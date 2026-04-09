@@ -1,17 +1,18 @@
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+
 import os
 import time
 import numpy as np
 import pickle
 
+import tf_slim as slim
 
 from models import generator
 from utils import DataLoader, load, save, psnr_error
 from constant import const
 import evaluate
 
-
-slim = tf.contrib.slim
 
 os.environ['CUDA_DEVICES_ORDER'] = "PCI_BUS_ID"
 os.environ['CUDA_VISIBLE_DEVICES'] = const.GPU
@@ -31,7 +32,7 @@ print(const)
 
 # define dataset
 with tf.name_scope('dataset'):
-    test_video_clips_tensor = tf.placeholder(shape=[1, height, width, 3 * (num_his + 1)],
+    test_video_clips_tensor = tf.compat.v1.placeholder(shape=[1, height, width, 3 * (num_his + 1)],
                                              dtype=tf.float32)
     test_inputs = test_video_clips_tensor[..., 0:num_his*3]
     test_gt = test_video_clips_tensor[..., -3:]
@@ -40,27 +41,27 @@ with tf.name_scope('dataset'):
 
 # define testing generator function and
 # in testing, only generator networks, there is no discriminator networks and flownet.
-with tf.variable_scope('generator', reuse=None):
-    print('testing = {}'.format(tf.get_variable_scope().name))
+with tf.compat.v1.variable_scope('generator', reuse=None):
+    print('testing = {}'.format(tf.compat.v1.get_variable_scope().name))
     test_outputs = generator(test_inputs, layers=4, output_channel=3)
     test_psnr_error = psnr_error(gen_frames=test_outputs, gt_frames=test_gt)
 
 
-config = tf.ConfigProto()
+config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-with tf.Session(config=config) as sess:
+with tf.compat.v1.Session(config=config) as sess:
     # dataset
     data_loader = DataLoader(test_folder, height, width)
 
     # initialize weights
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.compat.v1.global_variables_initializer())
     print('Init global successfully!')
 
     # tf saver
-    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=None)
+    saver = tf.compat.v1.train.Saver(var_list=tf.compat.v1.global_variables(), max_to_keep=None)
 
-    restore_var = [v for v in tf.global_variables()]
-    loader = tf.train.Saver(var_list=restore_var)
+    restore_var = [v for v in tf.compat.v1.global_variables()]
+    loader = tf.compat.v1.train.Saver(var_list=restore_var)
 
     def inference_func(ckpt, dataset_name, evaluate_name):
         load(loader, sess, ckpt)

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 import copy
-slim = tf.contrib.slim
+import tf_slim as slim
+import tensorflow_probability as tfp
 
 _preprocessing_ops = tf.load_op_library(
-    tf.resource_loader.get_path_to_datafile("./ops/build/preprocessing.so"))
+    tf.compat.v1.resource_loader.get_path_to_datafile("./ops/build/preprocessing.so"))
 
 
 # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/slim/python/slim/data/tfexample_decoder.py
@@ -30,7 +31,7 @@ class Image(slim.tfexample_decoder.ItemHandler):
           dtype: images will be decoded at this bit depth. Different formats
             support different bit depths.
               See tf.image.decode_image,
-                  tf.decode_raw,
+                  tf.io.decode_raw,
           repeated: if False, decodes a single image. If True, decodes a
             variable number of image strings from a 1D tensor of strings.
         """
@@ -64,10 +65,9 @@ class Image(slim.tfexample_decoder.ItemHandler):
         """
         def decode_raw():
             """Decodes a raw image."""
-            return tf.decode_raw(image_buffer, out_type=self._dtype)
+            return tf.io.decode_raw(image_buffer, out_type=self._dtype)
 
         image = decode_raw()
-        # image.set_shape([None, None, self._channels])
         if self._shape is not None:
             image = tf.reshape(image, self._shape)
 
@@ -84,11 +84,11 @@ def __get_dataset(dataset_config, split_name):
             raise ValueError('split name %s not recognized' % split_name)
 
         IMAGE_HEIGHT, IMAGE_WIDTH = dataset_config['IMAGE_HEIGHT'], dataset_config['IMAGE_WIDTH']
-        reader = tf.TFRecordReader
+        reader = tf.compat.v1.TFRecordReader
         keys_to_features = {
-            'image_a': tf.FixedLenFeature((), tf.string),
-            'image_b': tf.FixedLenFeature((), tf.string),
-            'flow': tf.FixedLenFeature((), tf.string),
+            'image_a': tf.io.FixedLenFeature((), tf.string),
+            'image_b': tf.io.FixedLenFeature((), tf.string),
+            'flow': tf.io.FixedLenFeature((), tf.string),
         }
         items_to_handlers = {
             'image_a': Image(
@@ -132,7 +132,7 @@ def config_to_arrays(dataset_config):
         del config['coeff_schedule_param']
 
     # Get all attributes
-    for (name, value) in config.iteritems():
+    for (name, value) in config.items():
         if name == 'coeff_schedule_param':
             output['coeff_schedule'] = [value['half_life'],
                                         value['initial_coeff'],
@@ -164,26 +164,26 @@ def _generate_coeff(param, discount_coeff=tf.constant(1.0), default_value=tf.con
 
     if rand_type == 'uniform':
         value = tf.cond(spread > 0.0,
-                        lambda: tf.random_uniform([], mean - spread, mean + spread),
+                        lambda: tf.random.uniform([], mean - spread, mean + spread),
                         lambda: mean)
         if exp:
             value = tf.exp(value)
     elif rand_type == 'gaussian':
         value = tf.cond(spread > 0.0,
-                        lambda: tf.random_normal([], mean, spread),
+                        lambda: tf.random.normal([], mean, spread),
                         lambda: mean)
         if exp:
             value = tf.exp(value)
     elif rand_type == 'bernoulli':
         if prob > 0.0:
-            value = tf.contrib.distributions.Bernoulli(probs=prob).sample([])
+            value = tfp.distributions.Bernoulli(probs=prob).sample([])
         else:
             value = 0.0
     elif rand_type == 'uniform_bernoulli':
         tmp1 = 0.0
         tmp2 = 0
         if prob > 0.0:
-            tmp2 = tf.contrib.distributions.Bernoulli(probs=prob).sample([])
+            tmp2 = tfp.distributions.Bernoulli(probs=prob).sample([])
         else:
             tmp2 = 0
 
@@ -192,7 +192,7 @@ def _generate_coeff(param, discount_coeff=tf.constant(1.0), default_value=tf.con
                 return default_value
         else:
             tmp1 = tf.cond(spread > 0.0,
-                           lambda: tf.random_uniform([], mean - spread, mean + spread),
+                           lambda: tf.random.uniform([], mean - spread, mean + spread),
                            lambda: mean)
         if exp:
             tmp1 = tf.exp(tmp1)
@@ -201,7 +201,7 @@ def _generate_coeff(param, discount_coeff=tf.constant(1.0), default_value=tf.con
         tmp1 = 0.0
         tmp2 = 0
         if prob > 0.0:
-            tmp2 = tf.contrib.distributions.Bernoulli(probs=prob).sample([])
+            tmp2 = tfp.distributions.Bernoulli(probs=prob).sample([])
         else:
             tmp2 = 0
 
@@ -210,7 +210,7 @@ def _generate_coeff(param, discount_coeff=tf.constant(1.0), default_value=tf.con
                 return default_value
         else:
             tmp1 = tf.cond(spread > 0.0,
-                           lambda: tf.random_normal([], mean, spread),
+                           lambda: tf.random.normal([], mean, spread),
                            lambda: mean)
         if exp:
             tmp1 = tf.exp(tmp1)
@@ -222,8 +222,8 @@ def _generate_coeff(param, discount_coeff=tf.constant(1.0), default_value=tf.con
 
 def load_batch(dataset_config, split_name, global_step):
     num_threads = 32
-    reader_kwargs = {'options': tf.python_io.TFRecordOptions(
-        tf.python_io.TFRecordCompressionType.ZLIB)}
+    reader_kwargs = {'options': tf.io.TFRecordOptions(
+        compression_type='ZLIB')}
 
     with tf.name_scope('load_batch'):
         dataset = __get_dataset(dataset_config, split_name)
@@ -234,7 +234,7 @@ def load_batch(dataset_config, split_name, global_step):
             common_queue_min=1024,
             reader_kwargs=reader_kwargs)
         image_a, image_b, flow = data_provider.get(['image_a', 'image_b', 'flow'])
-        image_a, image_b, flow = map(tf.to_float, [image_a, image_b, flow])
+        image_a, image_b, flow = [tf.cast(x, tf.float32) for x in [image_a, image_b, flow]]
 
         if dataset_config['PREPROCESS']['scale']:
             image_a = image_a / 255.0
@@ -245,7 +245,7 @@ def load_batch(dataset_config, split_name, global_step):
         config_a = config_to_arrays(dataset_config['PREPROCESS']['image_a'])
         config_b = config_to_arrays(dataset_config['PREPROCESS']['image_b'])
 
-        image_as, image_bs, flows = map(lambda x: tf.expand_dims(x, 0), [image_a, image_b, flow])
+        image_as, image_bs, flows = [tf.expand_dims(x, 0) for x in [image_a, image_b, flow]]
 
         # Perform data augmentation on GPU
         with tf.device('/cpu:0'):
@@ -285,7 +285,7 @@ def load_batch(dataset_config, split_name, global_step):
 
                 noise_coeff_a = _generate_coeff(
                     dataset_config['PREPROCESS']['image_a']['noise'], discount_coeff)
-                noise_a = tf.random_normal(shape=tf.shape(image_as),
+                noise_a = tf.random.normal(shape=tf.shape(image_as),
                                            mean=0.0, stddev=noise_coeff_a,
                                            dtype=tf.float32)
                 image_as = tf.clip_by_value(image_as + noise_a, 0.0, 1.0)
@@ -312,7 +312,7 @@ def load_batch(dataset_config, split_name, global_step):
 
             # Add noise to B if needed
             if noise_coeff_b is not None:
-                noise_b = tf.random_normal(shape=tf.shape(image_bs),
+                noise_b = tf.random.normal(shape=tf.shape(image_bs),
                                            mean=0.0, stddev=noise_coeff_b,
                                            dtype=tf.float32)
                 image_bs = tf.clip_by_value(image_bs + noise_b, 0.0, 1.0)
@@ -321,7 +321,7 @@ def load_batch(dataset_config, split_name, global_step):
             flows = _preprocessing_ops.flow_augmentation(
                 flows, transforms_from_a, transforms_from_b, crop)
 
-            return tf.train.batch([image_as, image_bs, flows],
+            return tf.compat.v1.train.batch([image_as, image_bs, flows],
                                   enqueue_many=True,
                                   batch_size=dataset_config['BATCH_SIZE'],
                                   capacity=dataset_config['BATCH_SIZE'] * 4,

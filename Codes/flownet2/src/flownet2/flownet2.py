@@ -5,7 +5,7 @@ from ..flow_warp import flow_warp
 from ..utils import LeakyReLU, average_endpoint_error, pad, antipad
 from ..downsample import downsample
 import tensorflow as tf
-slim = tf.contrib.slim
+import tf_slim as slim
 
 
 class FlowNet2(Net):
@@ -17,14 +17,14 @@ class FlowNet2(Net):
 
     def model(self, inputs, training_schedule, trainable=True):
         _, height, width, _ = inputs['input_a'].shape.as_list()
-        with tf.variable_scope('FlowNet2'):
+        with tf.compat.v1.variable_scope('FlowNet2'):
             # Forward pass through FlowNetCSS and FlowNetSD with weights frozen
             net_css_predictions = self.net_css.model(inputs, training_schedule, trainable=True)
             net_sd_predictions = self.net_sd.model(inputs, training_schedule, trainable=True)
 
             def ChannelNorm(tensor):
                 sq = tf.square(tensor)
-                r_sum = tf.reduce_sum(sq, keep_dims=True, axis=3)
+                r_sum = tf.reduce_sum(sq, keepdims=True, axis=3)
                 return tf.sqrt(r_sum)
 
             sd_flow_norm = ChannelNorm(net_sd_predictions['flow'])
@@ -97,7 +97,7 @@ class FlowNet2(Net):
                     predict_flow0 = slim.conv2d(pad(fuse_interconv0), 2,
                                                 3, activation_fn=None, scope='predict_flow0')
 
-                    flow = tf.image.resize_bilinear(
+                    flow = tf.compat.v1.image.resize_bilinear(
                         predict_flow0, tf.stack([height, width]), align_corners=True)
                     print(predict_flow0)
                     print(flow)
@@ -112,7 +112,7 @@ class FlowNet2(Net):
         size = [predict_flow0.shape[1], predict_flow0.shape[2]]
         downsampled_flow0 = downsample(flow, size)
         loss = average_endpoint_error(downsampled_flow0, predict_flow0)
-        tf.losses.add_loss(loss)
+        tf.compat.v1.losses.add_loss(loss)
 
         # Return the 'total' loss: loss fns + regularization terms defined in the model
-        return tf.losses.get_total_loss()
+        return tf.compat.v1.losses.get_total_loss()

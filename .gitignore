@@ -11,10 +11,11 @@ Codes/checkpoints/shanghaitech.*
 Codes/checkpoints/flownet-SD.*
 
 # Datasets
-Data/avenue/
-Data/ped1/
-Data/ped2/
-Data/shanghaitech/
+Data/
+
+# Summary & PSNR outputs
+Codes/summary/
+Codes/psnrs/
 
 # IDE & tool configs
 .vscode/

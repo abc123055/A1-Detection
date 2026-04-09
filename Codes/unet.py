@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.contrib.layers import conv2d, max_pool2d, conv2d_transpose
+from tf_slim import conv2d, max_pool2d, conv2d_transpose
 
 
 def unet(inputs, layers, features_root=64, filter_size=3, pool_size=2, output_channel=1):
@@ -19,12 +19,11 @@ def unet(inputs, layers, features_root=64, filter_size=3, pool_size=2, output_ch
         features = 2**layer*features_root
 
         conv1 = conv2d(inputs=in_node, num_outputs=features, kernel_size=filter_size)
-        conv2 = conv2d(inputs=conv1, num_outputs=features, kernel_size=filter_size)
-        conv.append(conv2)
+        conv2_ = conv2d(inputs=conv1, num_outputs=features, kernel_size=filter_size)
+        conv.append(conv2_)
 
         if layer < layers - 1:
-            in_node = max_pool2d(inputs=conv2, kernel_size=pool_size, padding='SAME')
-            # in_node = conv2d(inputs=conv2, num_outputs=features, kernel_size=filter_size, stride=2)
+            in_node = max_pool2d(inputs=conv2_, kernel_size=pool_size, padding='SAME')
 
     in_node = conv[-1]
 

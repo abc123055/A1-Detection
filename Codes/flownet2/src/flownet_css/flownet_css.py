@@ -13,7 +13,7 @@ class FlowNetCSS(Net):
         super(FlowNetCSS, self).__init__(mode=mode, debug=debug)
 
     def model(self, inputs, training_schedule, trainable=True):
-        with tf.variable_scope('FlowNetCSS'):
+        with tf.compat.v1.variable_scope('FlowNetCSS'):
             # Forward pass through FlowNetCS with weights frozen
             net_cs_predictions = self.net_cs.model(inputs, training_schedule, trainable=True)
 
@@ -23,7 +23,7 @@ class FlowNetCSS(Net):
             # Compute brightness error: sqrt(sum (input_a - warped)^2 over channels)
             brightness_error = inputs['input_a'] - warped
             brightness_error = tf.square(brightness_error)
-            brightness_error = tf.reduce_sum(brightness_error, keep_dims=True, axis=3)
+            brightness_error = tf.reduce_sum(brightness_error, keepdims=True, axis=3)
             brightness_error = tf.sqrt(brightness_error)
 
             # Gather all inputs to FlowNetS

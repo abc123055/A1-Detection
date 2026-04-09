@@ -739,6 +739,20 @@ def test_func(*args):
     print('optimal = {}'.format(result))
 
 
+def unsupervised_eval(loss_file):
+    """Evaluate without ground truth using PSNR distribution analysis."""
+    from evaluate_unsupervised import evaluate_unsupervised
+    if os.path.isdir(loss_file):
+        files = sorted([os.path.join(loss_file, f) for f in os.listdir(loss_file)
+                         if not os.path.isdir(os.path.join(loss_file, f))])
+        score = 0
+        for f in files:
+            score = evaluate_unsupervised(f, sigma=3.0, do_plot=True)
+        return score
+    else:
+        return evaluate_unsupervised(loss_file, sigma=3.0, do_plot=True)
+
+
 eval_type_function = {
     'compute_auc': compute_auc,
     'compute_eer': compute_eer,
@@ -749,6 +763,7 @@ eval_type_function = {
     'average_psnr_sample': average_psnr,
     'compute_frame_accuracy': compute_frame_accuracy,
     'compute_video_accuracy': compute_video_accuracy,
+    'unsupervised': unsupervised_eval,
 }
 
 
